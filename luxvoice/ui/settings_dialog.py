@@ -599,6 +599,15 @@ class SettingsDialog(QDialog):
         # Специальные кнопки для раздела ИИ-провайдер.
         if key == "ai":
             self._form.addSpacing(12)
+            
+            # Кнопка автоопределения
+            detect_button = QPushButton("Найти запущенный сервер")
+            detect_button.setToolTip(
+                "Автоматически определяет работающий LM Studio или Ollama")
+            detect_button.clicked.connect(self._detect_ai_server)
+            self._form.addWidget(detect_button)
+            
+            # Кнопка проверки подключения
             test_button = QPushButton("Проверить подключение")
             test_button.setToolTip("Отправляет тестовый запрос к выбранному провайдеру")
             test_button.clicked.connect(self._test_ai_connection)
@@ -762,6 +771,51 @@ class SettingsDialog(QDialog):
 
         except Exception as exc:  # noqa: BLE001
             self._test_result.setText(f"✗ Ошибка: {exc}")
+            self._test_result.setStyleSheet("color: red;")
+
+    def _detect_ai_server(self) -> None:
+        """Автоматически найти запущенный локальный сервер."""
+        self._test_result.setText("Ищу запущенные серверы...")
+        self._test_result.setStyleSheet("color: gray;")
+        QApplication.processEvents()
+
+        try:
+            from luxvoice.ai.client import get_ai_client
+            client = get_ai_client(self._settings)
+            
+            found = client.detect_running_server()
+            
+            if found:
+                # Переключаем на найденный провайдер.
+                self._settings.set("ai.provider", found, save=True)
+                self._settings.set("ai.enabled", True, save=True)
+                self._changed_keys.add("ai.provider")
+                self._changed_keys.add("ai.enabled")
+                
+                # Обновляем интерфейс.
+                for row in self._rows:
+                    if row.setting.key == "ai.provider":
+                        row.update_value(found)
+                    elif row.setting.key == "ai.enabled":
+                        row.update_value(True)
+                
+                provider_name = "LM Studio" if found == "lmstudio" else "Ollama"
+                self._test_result.setText(
+                    f"✓ Найден {provider_name}!\n\n"
+                    f"Провайдер переключён автоматически. "
+                    f"Нажмите 'Проверить подключение' для теста."
+                )
+                self._test_result.setStyleSheet("color: green;")
+            else:
+                self._test_result.setText(
+                    "✗ Не найдено запущенных серверов\n\n"
+                    "Запустите LM Studio (Local Server) или Ollama (ollama serve)\n"
+                    "и нажмите кнопку снова."
+                )
+                self._test_result.setStyleSheet("color: orange;")
+                
+        except Exception as exc:  # noqa: BLE001
+            self._test_result.setText(f"✗ Ошибка поиска: {exc}")
             self._test_result.setStyleSheet("color: red;")
 
     def _on_provider_changed(self, key: str, value: Any) -> None:

@@ -475,11 +475,57 @@ class AiClient:
                                   system="Ты проверяешь подключение.",
                                   max_tokens=10, timeout=25)
         except Exception as exc:  # noqa: BLE001
-            return False, str(exc)
+            error_msg = str(exc)
+            
+            # Улучшенные сообщения для типичных ошибок локальных серверов.
+            if provider.local and "Connection refused" in error_msg:
+                if provider.key == "ollama":
+                    return False, (
+                        f"Ollama не запущена на {provider.base_url}\n\n"
+                        "Установите: curl -fsSL https://ollama.com/install.sh | sh\n"
+                        "Запустите: ollama serve\n"
+                        "Скачайте модель: ollama pull llama3.1\n\n"
+                        "Или переключитесь на LM Studio, если он запущен."
+                    )
+                elif provider.key == "lmstudio":
+                    return False, (
+                        f"LM Studio не запущен на {provider.base_url}\n\n"
+                        "Откройте LM Studio → Local Server → Start Server\n\n"
+                        "Или переключитесь на Ollama, если она установлена."
+                    )
+                else:
+                    return False, (
+                        f"Сервер не отвечает на {provider.base_url}\n\n"
+                        "Убедитесь, что сервер запущен и порт правильный."
+                    )
+            
+            return False, f"сбой запроса: {error_msg}"
 
         if reply.error:
             return False, reply.error
         return True, f"Подключение работает. Ответ сервиса: {reply.text[:60]}"
+
+    def detect_running_server(self) -> str | None:
+        """Автоопределение запущенного локального сервера."""
+        import requests
+        
+        # Проверяем LM Studio (порт 1234)
+        try:
+            response = requests.get("http://localhost:1234/v1/models", timeout=2)
+            if response.status_code == 200:
+                return "lmstudio"
+        except Exception:  # noqa: BLE001
+            pass
+        
+        # Проверяем Ollama (порт 11434)
+        try:
+            response = requests.get("http://localhost:11434/v1/models", timeout=2)
+            if response.status_code == 200:
+                return "ollama"
+        except Exception:  # noqa: BLE001
+            pass
+        
+        return None
 
     def list_models(self) -> list[str]:
         """Список моделей провайдера, если сервис его отдаёт."""
