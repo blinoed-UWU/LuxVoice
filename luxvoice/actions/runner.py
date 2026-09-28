@@ -141,6 +141,14 @@ class CommandRunner:
         # 3. Поиск команды.
         contexts = self._window_contexts()
         result = self._matcher.match(text, window_titles=contexts)
+        
+        # Логируем распознанный текст и результат matching
+        log.info("Распознано: %r", text)
+        if result.found:
+            log.info("Найдена команда: %s (score: %.0f%%)", 
+                    result.command.title if result.command else "?", result.score)
+        else:
+            log.info("Команда не найдена: %s", result.reason)
 
         if not result.found:
             # Сказано только обращение — это вызов ассистента.

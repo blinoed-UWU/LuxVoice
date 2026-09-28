@@ -388,9 +388,10 @@ class Matcher:
 
     @property
     def threshold(self) -> float:
+        """Минимальный порог сходства для срабатывания команды (0-100)."""
         if self._settings is None:
-            return 72.0
-        return float(self._settings.number("match.threshold", 72))
+            return 80.0  # Повышен с 72 для уменьшения ложных срабатываний
+        return float(self._settings.number("match.threshold", 80))
 
     @property
     def prefix_threshold(self) -> float:
@@ -573,8 +574,16 @@ class Matcher:
             known = {c.id for c in candidates}
             extra = [self._store.get(cid) for cid in by_keyword - known]
             candidates = candidates + [c for c in extra if c is not None]
+        
+        # Если нет кандидатов по словам — не берём все команды (это приводит
+        # к ложным срабатываниям на любой шум). Возвращаем "не найдено".
         if not candidates:
-            candidates = self._store.enabled_commands()
+            return MatchResult(
+                command=None,
+                phrase=normalized,
+                score=0,
+                reason="нет кандидатов по словам",
+            )
 
         titles = [normalize_phrase(t) for t in window_titles if t]
         try:

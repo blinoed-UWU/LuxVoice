@@ -208,8 +208,8 @@ _SETTINGS: list[Setting] = [
             depends_on=("stt.engine", "cloud"), level="advanced"),
 
     # ================= ВЫПОЛНЕНИЕ КОМАНД =================
-    Setting("match.threshold", "Порог совпадения фраз", 72, INT, "execution",
-            "Насколько похожей должна быть фраза. Ниже — понимает неточную речь, но путает команды.",
+    Setting("match.threshold", "Порог совпадения фраз", 80, INT, "execution",
+            "Насколько похожей должна быть фраза. Ниже — понимает неточную речь, но путает команды. Выше — точнее, но требует чёткой речи.",
             minimum=40, maximum=100, unit="%"),
     Setting("match.prefix_threshold", "Порог совпадения с обращением", 70, INT, "execution",
             None, minimum=40, maximum=100, unit="%", level="advanced"),
