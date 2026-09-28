@@ -1,0 +1,14 @@
+# Зависимости для Linux
+PyQt6>=6.6.0
+requests>=2.31.0
+vosk>=0.3.45
+sounddevice>=0.4.6
+numpy>=1.24.0
+rapidfuzz>=3.0.0
+edge-tts>=6.1.0
+pyttsx3>=2.90
+python-evdev>=1.6.0
+pyudev>=0.24.0
+
+# Опционально для Wayland
+python-xlib>=0.33; platform_system=="Linux"

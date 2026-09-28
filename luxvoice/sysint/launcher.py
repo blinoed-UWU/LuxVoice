@@ -177,10 +177,17 @@ class AppLocator:
                 return list(self._entries)
 
         result: list[AppEntry] = []
-        result.extend(self._scan_desktop())
+        
+        # Платформо-зависимое сканирование
+        import sys
+        if sys.platform == "win32":
+            result.extend(self._scan_windows())
+        else:
+            result.extend(self._scan_desktop())
+            result.extend(self._scan_flatpak())
+            result.extend(self._scan_snap())
+        
         result.extend(self._scan_path())
-        result.extend(self._scan_flatpak())
-        result.extend(self._scan_snap())
 
         # Убираем дубликаты по команде запуска, сохраняя более «богатые» записи.
         unique: dict[str, AppEntry] = {}
@@ -394,6 +401,104 @@ class AppLocator:
             if name:
                 result.append(AppEntry(name=name, command=name, source="snap"))
         return result
+
+    def _scan_windows(self) -> list[AppEntry]:
+        """Сканирование программ в Windows: Start Menu и Program Files."""
+        result: list[AppEntry] = []
+        
+        # Пути для поиска ярлыков
+        start_menu_paths = [
+            Path(os.environ.get("APPDATA", "")) / "Microsoft" / "Windows" / "Start Menu" / "Programs",
+            Path(os.environ.get("ProgramData", "")) / "Microsoft" / "Windows" / "Start Menu" / "Programs",
+        ]
+        
+        # Сканируем Start Menu shortcuts
+        for start_path in start_menu_paths:
+            if not start_path.exists():
+                continue
+            try:
+                for lnk_file in start_path.rglob("*.lnk"):
+                    entry = self._parse_windows_shortcut(lnk_file)
+                    if entry:
+                        result.append(entry)
+            except OSError:
+                continue
+        
+        # Сканируем Program Files для популярных программ
+        program_dirs = [
+            Path(os.environ.get("ProgramFiles", r"C:\Program Files")),
+            Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")),
+            Path(os.environ.get("LOCALAPPDATA", "")) / "Programs",
+        ]
+        
+        # Популярные программы, которые часто не имеют ярлыков
+        popular_apps = {
+            "Code.exe": "Visual Studio Code",
+            "chrome.exe": "Google Chrome",
+            "firefox.exe": "Mozilla Firefox",
+            "msedge.exe": "Microsoft Edge",
+            "Telegram.exe": "Telegram",
+            "Discord.exe": "Discord",
+            "Steam.exe": "Steam",
+            "Spotify.exe": "Spotify",
+            "notepad++.exe": "Notepad++",
+            "7zFM.exe": "7-Zip",
+        }
+        
+        for prog_dir in program_dirs:
+            if not prog_dir.exists():
+                continue
+            try:
+                # Ищем .exe файлы в подпапках (максимум 2 уровня)
+                for item in prog_dir.iterdir():
+                    if not item.is_dir():
+                        continue
+                    
+                    # Проверяем подпапки
+                    for subitem in item.rglob("*.exe"):
+                        exe_name = subitem.name
+                        if exe_name in popular_apps:
+                            result.append(AppEntry(
+                                name=popular_apps[exe_name],
+                                command=str(subitem),
+                                source="program_files",
+                            ))
+                        elif exe_name.lower() not in ["uninstall", "setup", "installer"]:
+                            # Добавляем другие .exe как программы
+                            name = exe_name.replace(".exe", "").replace("_", " ")
+                            if len(name) > 2:  # Пропускаем слишком короткие имена
+                                result.append(AppEntry(
+                                    name=name,
+                                    command=str(subitem),
+                                    source="program_files",
+                                ))
+            except OSError:
+                continue
+        
+        return result
+    
+    def _parse_windows_shortcut(self, lnk_path: Path) -> AppEntry | None:
+        """Парсинг Windows .lnk файла."""
+        try:
+            import win32com.client
+            shell = win32com.client.Dispatch("WScript.Shell")
+            shortcut = shell.CreateShortCut(str(lnk_path))
+            target = shortcut.Targetpath
+            
+            if not target or not Path(target).exists():
+                return None
+            
+            # Получаем имя из названия ярлыка
+            name = lnk_path.stem
+            return AppEntry(
+                name=name,
+                command=target,
+                path=str(lnk_path),
+                source="start_menu",
+            )
+        except Exception:
+            # Если win32com не доступен, пропускаем
+            return None
 
     # --- Поиск ------------------------------------------------------------
 

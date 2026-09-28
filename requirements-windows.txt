@@ -1,0 +1,20 @@
+# Зависимости для Windows
+PyQt6>=6.6.0
+requests>=2.31.0
+vosk>=0.3.45
+sounddevice>=0.4.6
+numpy>=1.24.0
+rapidfuzz>=3.0.0
+edge-tts>=6.1.0
+pyttsx3>=2.90
+
+# Windows-специфичные библиотеки
+pyautogui>=0.9.54
+pygetwindow>=0.0.9
+pycaw>=20230407
+pyperclip>=1.8.2
+comtypes>=1.2.0
+Pillow>=10.0.0
+
+# Опционально для лучшего распознавания речи
+faster-whisper>=0.10.0

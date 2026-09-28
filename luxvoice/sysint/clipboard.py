@@ -1,53 +1,25 @@
 """Буфер обмена и получение выделенного текста.
 
-В Wayland обычные X11-утилиты не работают: буфер принадлежит композитору.
-Поэтому используется тот инструмент, который есть в системе, по порядку:
-  * wl-clipboard (wl-copy, wl-paste) — родной для Wayland;
-  * xclip или xsel — для X11 и XWayland;
-  * KDE-специфичный вызов через Klipper.
+Кроссплатформенная реализация через платформенный интерфейс.
 """
 
 from __future__ import annotations
 
 import logging
-import shutil
-import subprocess
-from pathlib import Path
+
+from luxvoice.sysint.base import platform
 
 log = logging.getLogger(__name__)
 
 
-def _run(cmd: list[str], timeout: float = 5.0,
-         data: bytes | None = None) -> tuple[int, str]:
-    """Запустить утилиту, при необходимости передав данные на вход."""
-    try:
-        completed = subprocess.run(
-            cmd, input=data, capture_output=True, timeout=timeout)
-        return completed.returncode, completed.stdout.decode("utf-8", "replace")
-    except FileNotFoundError:
-        return 127, ""
-    except subprocess.TimeoutExpired:
-        return 124, ""
-    except OSError as exc:
-        log.debug("Сбой вызова %s: %s", cmd[0], exc)
-        return 1, ""
-
-
-def _has(name: str) -> bool:
-    return shutil.which(name) is not None
-
-
-def _is_wayland() -> bool:
-    import os
-    return os.environ.get("XDG_SESSION_TYPE", "") == "wayland" or bool(
-        os.environ.get("WAYLAND_DISPLAY"))
-
-
 def get_text() -> str:
     """Прочитать текст из буфера обмена."""
-    candidates: list[list[str]] = []
-    if _is_wayland() and _has("wl-paste"):
-        candidates.append(["wl-paste", "--no-newline"])
+    return platform().get_clipboard()
+
+
+def set_text(text: str) -> bool:
+    """Записать текст в буфер обмена."""
+    return platform().set_clipboard(text)
     if _has("xclip"):
         candidates.append(["xclip", "-selection", "clipboard", "-o"])
     if _has("xsel"):
